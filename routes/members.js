@@ -51,10 +51,10 @@ router.get('/:id/payments', async (req, res) => {
       months.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2, '0')}`);
     }
 
-    // Ensure payment rows exist for each month (insert ignore)
+    // Ensure payment rows exist for each month (insert ignore) - include remaining_amount default 0
     for (const m of months) {
       await pool.query(
-        `INSERT IGNORE INTO payments (member_id, month_year, amount, status) VALUES (?, ?, 0, 'Pending')`,
+        `INSERT IGNORE INTO payments (member_id, month_year, amount, status, remaining_amount) VALUES (?, ?, 0, 'Pending', 0)`,
         [memberId, m]
       );
     }

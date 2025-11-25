@@ -24,8 +24,11 @@ function generateReceiptPDF(member, payment) {
 
       // Payment details
       doc.fontSize(12).text(`Month: ${payment.month_year}`);
-      doc.text(`Amount Paid: Rs ${payment.amount}`);
-      doc.text(`Payment Date: ${new Date(payment.payment_date).toLocaleString()}`);
+  doc.text(`Amount Paid: Rs ${payment.amount}`);
+  // show remaining amount if provided
+  const remaining = payment.remaining_amount === undefined || payment.remaining_amount === null ? 0 : payment.remaining_amount;
+  doc.text(`Remaining Amount: Rs ${remaining}`);
+  doc.text(`Payment Date: ${new Date(payment.payment_date).toLocaleString()}`);
       doc.moveDown(1);
 
       doc.fontSize(11).text('Thank you for your payment.', { align: 'left' });

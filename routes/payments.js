@@ -18,12 +18,14 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// Mark payment as paid and send receipt (body: { member_id, month_year, amount })
+// Mark payment as paid and send receipt (body: { member_id, month_year, amount, remaining_amount })
 router.post('/pay', async (req, res) => {
   const conn = await pool.getConnection();
   try {
-    const { member_id, month_year, amount } = req.body;
-    if (!member_id || !month_year || !amount) return res.status(400).json({ error: 'member_id, month_year and amount required' });
+    const { member_id, month_year, amount, remaining_amount } = req.body;
+    // amount is required; remaining_amount is optional (defaults to 0)
+    if (!member_id || !month_year || (amount === undefined || amount === null)) return res.status(400).json({ error: 'member_id, month_year and amount required' });
+    const remAmount = remaining_amount === undefined || remaining_amount === null ? 0 : remaining_amount;
 
     await conn.beginTransaction();
 
@@ -36,21 +38,21 @@ router.post('/pay', async (req, res) => {
     }
     const member = memRows[0];
 
-    // upsert payment (insert or update)
+    // upsert payment (insert or update) -- include remaining_amount
     const paymentDate = new Date();
     await conn.query(
-      `INSERT INTO payments (member_id, month_year, amount, status, payment_date)
-       VALUES (?, ?, ?, 'Paid', ?)
-       ON DUPLICATE KEY UPDATE amount = VALUES(amount), status='Paid', payment_date=VALUES(payment_date)`,
-      [member_id, month_year, amount, paymentDate]
+      `INSERT INTO payments (member_id, month_year, amount, status, payment_date, remaining_amount)
+       VALUES (?, ?, ?, 'Paid', ?, ?)
+       ON DUPLICATE KEY UPDATE amount = VALUES(amount), remaining_amount = VALUES(remaining_amount), status='Paid', payment_date=VALUES(payment_date)`,
+      [member_id, month_year, amount, paymentDate, remAmount]
     );
 
     // fetch payment row
     const [payRows] = await conn.query(`SELECT * FROM payments WHERE member_id = ? AND month_year = ?`, [member_id, month_year]);
     const payment = payRows[0];
 
-    // generate PDF buffer
-    const pdfBuffer = await generateReceiptPDF(member, { ...payment, payment_date: paymentDate, amount });
+  // generate PDF buffer (include remaining_amount)
+  const pdfBuffer = await generateReceiptPDF(member, { ...payment, payment_date: paymentDate, amount, remaining_amount: remAmount });
 
     // ensure receipts folder exists
     const receiptsDir = path.join(__dirname, '..', 'receipts');
